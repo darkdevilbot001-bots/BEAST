@@ -52,12 +52,15 @@ tokens.forEach((token, index) => {
 
   let connection;
   let player;
+  let isJoining = false;
 
   const safeDestroy = (conn) => {
     try {
       if (!conn) return;
       const status = conn.state && conn.state.status;
-      if (status !== VoiceConnectionStatus.Destroyed) conn.destroy();
+      if (status && status !== VoiceConnectionStatus.Destroyed) {
+        conn.destroy();
+      }
     } catch (e) {
       // ignore double-destroy or other race errors
     }
@@ -72,12 +75,22 @@ tokens.forEach((token, index) => {
     }
 
     if (commandName === 'bcva') {
+      if (isJoining) return reply('Already joining...');
+      
       const vc = member.voice.channel;
       if (!vc) return reply('You need to be in a voice channel first.');
 
+      isJoining = true;
       setTimeout(async () => {
         try {
-          safeDestroy(connection);
+          // Only destroy if connection exists and not destroyed
+          if (connection) {
+            const status = connection.state && connection.state.status;
+            if (status && status !== VoiceConnectionStatus.Destroyed) {
+              connection.destroy();
+            }
+          }
+          
           connection = joinVoiceChannel({
             channelId: vc.id,
             guildId: guild.id,
@@ -90,6 +103,8 @@ tokens.forEach((token, index) => {
         } catch (err) {
           console.error(`[Bot ${botNum}] JOIN ERROR:`, err.message);
           await reply('❌ Failed to join voice channel.');
+        } finally {
+          isJoining = false;
         }
       }, botNum * 200);
 
@@ -127,6 +142,7 @@ tokens.forEach((token, index) => {
 
     if (commandName === 'bclv') {
       safeDestroy(connection);
+      connection = null;
       return reply('✅ Left voice channel.');
     }
 
